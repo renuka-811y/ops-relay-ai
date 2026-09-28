@@ -1,0 +1,119 @@
+# OpsRelay AI - automated deployment rollback (simulated)
+#
+# Triggered by:
+#   1. workflow_dispatch   - manually, or by agent/sre_agent.py via the GitHub REST API
+#   2. repository_dispatch - webhook with event type "opsrelay-rollback" and a
+#                            client_payload of {"bad_commit": "...", "reason": "..."}
+#
+# This workflow SIMULATES a rollback: it validates the input, resolves the
+# previous known-good commit and writes a summary. Replace the
+# "Execute rollback" step with your real deploy command when you adopt it.
+
+name: OpsRelay Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      bad_commit:
+        description: "Commit SHA (or short SHA) to roll back"
+        required: true
+        type: string
+      reason:
+        description: "Why the rollback was triggered"
+        required: false
+        default: "Triggered by OpsRelay AI"
+        type: string
+      environment:
+        description: "Target environment"
+        required: false
+        default: "production"
+        type: choice
+        options:
+          - production
+          - staging
+  repository_dispatch:
+    types: [opsrelay-rollback]
+
+permissions:
+  contents: read
+
+# Never run two rollbacks against the same environment at once.
+concurrency:
+  group: opsrelay-rollback-${{ inputs.environment || github.event.client_payload.environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Roll back deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Values are passed through env vars (never interpolated into shell code)
+    # to avoid script injection from webhook payloads.
+    env:
+      BAD_COMMIT: ${{ inputs.bad_commit || github.event.client_payload.bad_commit || 'unknown' }}
+      REASON: ${{ inputs.reason || github.event.client_payload.reason || 'Triggered by OpsRelay AI' }}
+      TARGET_ENV: ${{ inputs.environment || github.event.client_payload.environment || 'production' }}
+
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate inputs
+        run: |
+          if [[ "$BAD_COMMIT" != "unknown" && ! "$BAD_COMMIT" =~ ^[0-9a-fA-F]{6,40}$ ]]; then
+            echo "::error::bad_commit must be a 6-40 character hex SHA or 'unknown' (got: $BAD_COMMIT)"
+            exit 1
+          fi
+          if [[ "$TARGET_ENV" != "production" && "$TARGET_ENV" != "staging" ]]; then
+            echo "::error::environment must be 'production' or 'staging' (got: $TARGET_ENV)"
+            exit 1
+          fi
+          echo "Rollback requested for commit '$BAD_COMMIT' in '$TARGET_ENV'"
+
+      - name: Resolve rollback target
+        id: target
+        run: |
+          # Prefer the parent of the bad commit; fall back to the previous commit on HEAD.
+          if [[ "$BAD_COMMIT" != "unknown" ]] && git cat-file -e "${BAD_COMMIT}^{commit}" 2>/dev/null; then
+            TARGET_SHA="$(git rev-parse "${BAD_COMMIT}^")"
+            SOURCE="parent of ${BAD_COMMIT}"
+          else
+            echo "::warning::Commit '$BAD_COMMIT' not found in this repository; using HEAD~1 instead."
+            TARGET_SHA="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+            SOURCE="HEAD~1 fallback"
+          fi
+          echo "sha=${TARGET_SHA}" >> "$GITHUB_OUTPUT"
+          echo "source=${SOURCE}" >> "$GITHUB_OUTPUT"
+          echo "Rollback target: ${TARGET_SHA} (${SOURCE})"
+
+      - name: Execute rollback (simulated)
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+        run: |
+          echo "==> Simulating deployment rollback"
+          echo "    environment : $TARGET_ENV"
+          echo "    rolling back: $BAD_COMMIT"
+          echo "    redeploying : $TARGET_SHA"
+          sleep 3
+          echo "==> Health check passed (simulated)"
+          echo "==> Rollback complete"
+
+      - name: Write job summary
+        env:
+          TARGET_SHA: ${{ steps.target.outputs.sha }}
+          TARGET_SOURCE: ${{ steps.target.outputs.source }}
+        run: |
+          {
+            echo "## ⏪ OpsRelay Rollback Complete (simulated)"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Environment | \`$TARGET_ENV\` |"
+            echo "| Rolled back commit | \`$BAD_COMMIT\` |"
+            echo "| Redeployed commit | \`$TARGET_SHA\` ($TARGET_SOURCE) |"
+            echo "| Trigger | \`${{ github.event_name }}\` |"
+            echo "| Reason | $REASON |"
+          } >> "$GITHUB_STEP_SUMMARY"
