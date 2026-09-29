@@ -49,7 +49,7 @@ from app.main import CRASH_ERROR_MESSAGE, MEMORY_LEAK_ERROR_MESSAGE  # noqa: E40
 
 logger = logging.getLogger("opsrelay.agent")
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.8-flash"
 GITHUB_API_VERSION = "2022-11-28"
 
 DECISION_ROLLBACK = "ROLLBACK"

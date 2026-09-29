@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 # Try importing official Hindsight SDK; fall back gracefully if needed
 try:
-    from hindsight import HindsightClient
+    from hindsight_client import Hindsight
     HINDSIGHT_AVAILABLE = True
 except ImportError:
     HINDSIGHT_AVAILABLE = False
@@ -37,7 +37,10 @@ def get_client():
     if not api_key or api_key == "demo_key":
         return None
     try:
-        return HindsightClient(api_key=api_key)
+        return Hindsight(
+            base_url=DEFAULT_BASE_URL,
+            api_key=api_key
+            )
     except Exception as e:
         logger.warning(f"Failed to initialize Hindsight client: {e}")
         return None

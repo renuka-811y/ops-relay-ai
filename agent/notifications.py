@@ -35,8 +35,8 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _truncate(text: str, limit: int = SLACK_SECTION_LIMIT) -> str:
-    """Trim text to fit inside a Slack block."""
+def _truncate(text, limit=350):
+    text = str(text)
     return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
