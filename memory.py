@@ -112,8 +112,8 @@ def recall_past_incidents(error_log: str, *args, **kwargs) -> dict:
 
 def recall_incident_learning(log_trace: str) -> str:
     """
-    Bridge function imported by sre_agent.py.
-    Queries Hindsight memory and returns a formatted string context.
+    Bridge function for sre_agent.py.
+    Queries Hindsight memory and returns a plain string context.
     """
     result = recall_past_incidents(log_trace)
     return result.get("summary", "No prior incident records found.")
