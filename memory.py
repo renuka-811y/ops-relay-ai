@@ -5,7 +5,7 @@ from typing import Any, Optional
 from dotenv import load_dotenv
 
 try:
-    from hindsight_client import Hindsight
+    from hindsight import HindsightClient
     HINDSIGHT_AVAILABLE = True
 except ImportError:
     HINDSIGHT_AVAILABLE = False
@@ -41,10 +41,8 @@ def get_client():
         return None
         
     try:
-        return Hindsight(
-            base_url=DEFAULT_BASE_URL,
-            api_key=api_key
-        )
+        base_url = os.getenv("HINDSIGHT_BASE_URL", DEFAULT_BASE_URL)
+        return HindsightClient(api_key=api_key, base_url=base_url)
     except Exception as e:
         logger.warning(f"Failed to initialize Hindsight client: {e}")
         return None
@@ -114,8 +112,8 @@ def recall_past_incidents(error_log: str, *args, **kwargs) -> dict:
 
 def recall_incident_learning(log_trace: str) -> str:
     """
-    Bridge function imported by sre_agent.py.
-    Queries Hindsight memory and returns a formatted string context.
+    Bridge function for sre_agent.py.
+    Queries Hindsight memory and returns a plain string context.
     """
     result = recall_past_incidents(log_trace)
     return result.get("summary", "No prior incident records found.")
